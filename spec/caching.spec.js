@@ -55,6 +55,17 @@ function getCompiledModules (statsJson) {
   return builtModules;
 }
 
+function getEmittedAssets (statsJson) {
+  const emittedAssets = statsJson.assets.filter(webpackAsset => webpackAsset.emitted).map((webpackAsset) => {
+    return webpackAsset.name;
+  });
+  statsJson.children.forEach((childCompilationStats) => {
+    const emittedChildAssets = getEmittedAssets(childCompilationStats);
+    Array.prototype.push.apply(emittedAssets, emittedChildAssets);
+  });
+  return emittedAssets;
+}
+
 function getCompiledModuleCount (statsJson) {
   return getCompiledModules(statsJson).length;
 }
@@ -101,6 +112,36 @@ describe('HtmlWebpackPluginCaching', () => {
         expectNoErrors(stats);
         // Verify that no file was built
         expect(getCompiledModules(stats.toJson()))
+          .toEqual([]);
+        // Verify that the html was processed only during the initial build
+        expect(htmlWebpackPlugin.evaluateCompilationResult.mock.calls.length)
+          .toBe(1);
+        // Verify that the child compilation was executed twice
+        expect(htmlWebpackPlugin.childCompilerHash)
+          .toBe(childCompilerHash);
+      })
+      .then(done);
+  });
+
+  it('should not re-emit if no file was changed', done => {
+    const template = path.join(__dirname, 'fixtures/plain.html');
+    const htmlWebpackPlugin = new HtmlWebpackPlugin({
+      template: template
+    });
+    let childCompilerHash;
+    const compiler = setUpCompiler(htmlWebpackPlugin);
+    compiler.addTestFile(path.join(__dirname, 'fixtures/index.js'));
+    compiler.run()
+      // Change the template file and compile again
+      .then(() => {
+        childCompilerHash = htmlWebpackPlugin.childCompilerHash;
+        return compiler.run();
+      })
+      .then(stats => {
+        // Expect no errors:
+        expectNoErrors(stats);
+        // Verify that no asset was emitted
+        expect(getEmittedAssets(stats.toJson()))
           .toEqual([]);
         // Verify that the html was processed only during the initial build
         expect(htmlWebpackPlugin.evaluateCompilationResult.mock.calls.length)

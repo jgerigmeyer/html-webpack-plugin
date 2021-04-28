@@ -253,9 +253,6 @@ function hookIntoCompiler (compiler, options, plugin) {
           // If the template and the assets did not change we don't have to emit the html
           const newAssetJson = JSON.stringify(getAssetFiles(assets));
           if (isCompilationCached && options.cache && assetJson === newAssetJson) {
-            previousEmittedAssets.forEach(({ name, html }) => {
-              compilation.emitAsset(name, new webpack.sources.RawSource(html, false));
-            });
             return callback();
           } else {
             previousEmittedAssets = [];
